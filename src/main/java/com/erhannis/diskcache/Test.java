@@ -181,7 +181,37 @@ public class Test {
         }
     }
 
+    public static class Zombie {
+
+        private int value;
+
+        public int setValue(int i) {
+            System.out.println("changing value from " + value + " to " + i);
+            int i0 = value;
+            value = i;
+            return i0;
+        }
+
+        @Override
+        protected void finalize() throws Throwable {
+            Test.finalized.add(this);
+        }
+    }
+
+    public static ArrayList<Object> finalized = new ArrayList<>();
+
     public static void main(String[] args) throws InterruptedException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
+        { // No dice; weak references aren't returned if the finalizer restores a reference.
+            WeakReference<Zombie> wr = new WeakReference<>(new Zombie());
+            while (finalized.isEmpty()) {
+                System.gc();
+            }
+            System.out.println("equal: " + (finalized.get(0) == wr.get()));
+
+            if (1 == 1) {
+                return;
+            }
+        }
         { // Address changed after 2260, from 3985369739 to 3992993792
             Field f = Unsafe.class.getDeclaredField("theUnsafe");
             f.setAccessible(true);
@@ -194,19 +224,19 @@ public class Test {
                 Object o = new Object();
                 long address = addressOf(unsafe, o);
                 addresses.put(o, address);
-                
+
                 for (Entry<Object, Long> entry : addresses.entrySet()) {
                     long curAddress = addressOf(unsafe, entry.getKey());
                     if (entry.getValue() != curAddress) {
                         throw new RuntimeException("Address changed after " + addresses.size() + ", from " + entry.getValue() + " to " + curAddress);
                     }
                 }
-                
+
                 if (1 == 0) {
                     break;
                 }
             }
-            
+
             if (1 == 1) {
                 return;
             }
@@ -269,18 +299,22 @@ public class Test {
                 Thread.sleep(10);
             }
         }
-
-        AgentLoader.loadAgentClass(HelloAgent.class.getName(), "Hello!");
-        ClassBlah cb = new ClassBlah();
-        int cbId = System.identityHashCode(cb);
-        cb.setValue(0);
-        ClassBlah cb2 = new ClassBlah();
-        cb2.setValue(0);
-        cb = null;
-        System.gc();
-        Thread.sleep(1000);
-        System.gc();
-        System.out.println("cbId " + cbId);
+        {
+            AgentLoader.loadAgentClass(HelloAgent.class.getName(), "Hello!");
+            ClassBlah cb = new ClassBlah();
+            int cbId = System.identityHashCode(cb);
+            cb.setValue(0);
+            ClassBlah cb2 = new ClassBlah();
+            cb2.setValue(0);
+            cb = null;
+            System.gc();
+            Thread.sleep(1000);
+            System.gc();
+            System.out.println("cbId " + cbId);
+            if (1 == 1) {
+                return;
+            }
+        }
     }
 
     public static long addressOf(Unsafe unsafe, Object o) {
