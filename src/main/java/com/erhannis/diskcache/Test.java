@@ -239,33 +239,102 @@ public class Test {
 
   public static ArrayList<Object> finalized = new ArrayList<>();
 
+  private static class Fake {
+    public long blahId;
+    public long uniqueId;
+  }
+
   public static void main(String[] args) throws InterruptedException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException, NoSuchMethodException {
-    { // I think maybe the extra field is working.
-      HashMap<Object, Long> addresses = new HashMap<>();
-      Object o0 = new Object();
-      System.out.println("address: " + o0.uniqueId);
+    { // Cool, wasn't COMPLETELY sure that field-hiding worked how I thought
+      Fake f = new Fake();
+      f.uniqueId = 1;
+      Object o = f;
+      o.uniqueId = 2;
+      System.out.println("f " + f.uniqueId);
+      System.out.println("o " + ((Object)f).uniqueId);
+      if (1 == 1) return;
+    }
+    {
+      Field field = Object.class.getDeclaredField("uniqueId");
+
+      HashMap<Fake, Long> addresses = new HashMap<>();
+      Fake o0 = new Fake();
+      System.out.println("address: " + field.getLong(o0));
+      long startTimestamp = System.currentTimeMillis();
       long id = 1;
-      while (true) {
-        Object o = new Object();
+      for (int i = 0; i < 30000; i++) {
+        Fake o = new Fake();
+        field.setLong(o, id);
+        id++;
+        long address = field.getLong(o);
+        addresses.put(o, address);
+
+        for (Entry<Fake, Long> entry : addresses.entrySet()) {
+          long curAddress = field.getLong(entry.getKey());
+          if (entry.getValue() != curAddress) {
+            throw new RuntimeException("Address changed after " + addresses.size() + ", from " + entry.getValue() + " to " + curAddress);
+          }
+        }
+      }
+      System.out.println("count " + addresses.size());
+      System.out.println("time " + (System.currentTimeMillis() - startTimestamp));
+      System.out.println();
+
+      if (1 == 1) {
+        return;
+      }
+    }
+    {
+      HashMap<Fake, Long> addresses = new HashMap<>();
+      Fake o0 = new Fake();
+      System.out.println("address: " + o0.uniqueId);
+      long startTimestamp = System.currentTimeMillis();
+      long id = 1;
+      for (int i = 0; i < 30000; i++) {
+        Fake o = new Fake();
         o.uniqueId = id;
         id++;
         long address = o.uniqueId;
         addresses.put(o, address);
 
-        for (Entry<Object, Long> entry : addresses.entrySet()) {
+        for (Entry<Fake, Long> entry : addresses.entrySet()) {
           long curAddress = entry.getKey().uniqueId;
           if (entry.getValue() != curAddress) {
             throw new RuntimeException("Address changed after " + addresses.size() + ", from " + entry.getValue() + " to " + curAddress);
           }
         }
-        if (addresses.size() % 100 == 0) {
-          System.out.println("count " + addresses.size());
-        }
+      }
+      System.out.println("count " + addresses.size());
+      System.out.println("time " + (System.currentTimeMillis() - startTimestamp));
+      System.out.println();
 
-        if (1 == 0) {
-          break;
+      if (1 == 1) {
+        return;
+      }
+    }
+    { // I think maybe the extra field is working.
+      HashMap<Fake, Long> addresses = new HashMap<>();
+      Fake o0 = new Fake();
+      System.out.println("address: " + o0.blahId);
+      long startTimestamp = System.currentTimeMillis();
+      long id = 1;
+      for (int i = 0; i < 30000; i++) {
+        Fake o = new Fake();
+        o.blahId = id;
+        id++;
+        long address = o.blahId;
+        addresses.put(o, address);
+
+        for (Entry<Fake, Long> entry : addresses.entrySet()) {
+          long curAddress = entry.getKey().blahId;
+          if (entry.getValue() != curAddress) {
+            throw new RuntimeException("Address changed after " + addresses.size() + ", from " + entry.getValue() + " to " + curAddress);
+          }
         }
       }
+      System.out.println("count " + addresses.size());
+      System.out.println("time " + (System.currentTimeMillis() - startTimestamp));
+      System.out.println();
 
       if (1 == 1) {
         return;
