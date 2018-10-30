@@ -5,14 +5,17 @@
  */
 package com.erhannis.diskcache;
 
+import java.sql.SQLException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  *
  * @author erhannis
  */
 public class DiskList<T> {
-  //private AtomicInteger size = new AtomicInteger(0);
+  private AtomicInteger size = new AtomicInteger(0);
   private final Context ctx;
 
   public DiskList(Context ctx) {
@@ -21,19 +24,34 @@ public class DiskList<T> {
   }
 
   //TODO Actually implement List?
-  public void add(T t) {
-    ctx.manager.listAdd(this, t);
+  public synchronized void add(T t) {
+    try {
+      ctx.manager.listAdd(this, t);
+      size.incrementAndGet();
+    } catch (SQLException ex) {
+      Logger.getLogger(DiskList.class.getName()).log(Level.SEVERE, null, ex);
+    }
   }
 
-  public T get(int index) {
-    return (T) ctx.manager.listGet(this, index);
+  public synchronized T get(int index) {
+    try {
+      return (T) ctx.manager.listGet(this, index);
+    } catch (SQLException ex) {
+      Logger.getLogger(DiskList.class.getName()).log(Level.SEVERE, null, ex);
+    }
   }
 
-  public int size() {
-    return ctx.manager.listSize(this);
+  public synchronized int size() {
+//    try {
+//      return ctx.manager.listSize(this);
+//    } catch (SQLException ex) {
+//      Logger.getLogger(DiskList.class.getName()).log(Level.SEVERE, null, ex);
+//    }
+    return size.get();
   }
 
-  public void remove(int index) {
+  public synchronized void remove(int index) {
     ctx.manager.listRemove(this, index);
+    size.decrementAndGet();
   }
 }

@@ -8,11 +8,14 @@ package com.erhannis.diskcache;
 import java.io.File;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
+import java.sql.Blob;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
@@ -29,10 +32,10 @@ public class ObjectManager {
 
   private AtomicLong curId = new AtomicLong(1);
 
-  private HashMap<Long, Object> objects = new HashMap<>();
+  private HashMap<Long, WeakReference<Object>> objects = new HashMap<>();
 
-  private final Connection conn;  
-  
+  private final Connection conn;
+
   private ObjectManager() {
     this(getTempFile());
   }
@@ -63,14 +66,30 @@ public class ObjectManager {
   public synchronized long getHandle(Object o) {
     if (o.uniqueId != 0) {
       o.uniqueId = curId.getAndIncrement();
-      objects.put(o.uniqueId, o);
+      objects.put(o.uniqueId, new WeakReference<Object>(o));
     }
     asdf(); //TODO Instrument class?
     return o.uniqueId;
   }
 
-  public synchronized Object getObject(long handle) {
-    return objects.get(handle);
+  public synchronized Object getObject(long handle) throws SQLException {
+    WeakReference<Object> wr = objects.get(handle);
+    if (wr != null) {
+      Object o = wr.get();
+      if (o != null) {
+        //TODO Deal with null values
+        return o;
+      }
+    }
+    PreparedStatement pstmt = conn.prepareStatement("SELECT value FROM objects WHERE id = ?");
+    pstmt.setLong(1, handle);
+    ResultSet rs = pstmt.executeQuery();
+    if (!rs.first()) {
+      //TODO Should return null?
+      throw new IndexOutOfBoundsException();
+    }
+    Blob objectBlob = rs.getBlob(1);
+    asdf;
   }
 
   public synchronized void removeHandle(Object o) {
@@ -103,26 +122,41 @@ public class ObjectManager {
   }
 
   //<editor-fold defaultstate="collapsed" desc="List">
+  //TODO Is this needed?
   protected synchronized void listRegister(DiskList list) {
     getHandle(list);
-    conn.createStatement().execute();
     asdf();
   }
 
-  protected synchronized void listAdd(DiskList list, Object o) {
-    getHandle(o);
+  protected synchronized void listAdd(DiskList list, Object o) throws SQLException {
+    long listId = getHandle(list);
+    int idx = listSize(list); //TODO OW
+    long objectId = getHandle(o);
+
+    PreparedStatement pstmt = conn.prepareStatement("INSERT INTO lists(list_id, idx, object_id) VALUES (?,?,?)");
+    pstmt.setLong(1, listId);
+    pstmt.setInt(2, idx);
+    pstmt.setLong(3, objectId);
+    pstmt.executeUpdate();
+  }
+
+  protected synchronized Object listGet(DiskList list, int index) throws SQLException {
+    long listId = getHandle(list);
+
+    //TODO Weak hash map, avoid unnecessary reads
+    PreparedStatement pstmt = conn.prepareStatement("SELECT object_id FROM lists WHERE list_id = ? AND idx = ?");
+    pstmt.setLong(1, listId);
+    pstmt.setInt(2, index);
+    ResultSet rs = pstmt.executeQuery();
+    if (!rs.first()) {
+      throw new IndexOutOfBoundsException();
+    }
+    long objectId = rs.getLong(1);
+
     asdf();
   }
 
-  protected synchronized Object listGet(DiskList list, int index) {
-    asdf();
-  }
- 
-  /**
-   * Assumes `list` has already been registered
-   * @param list
-   * @return 
-   */
+  //TODO Remove this?
   protected synchronized int listSize(DiskList list) throws SQLException {
     ResultSet rs = conn.createStatement().executeQuery("SELECT count(*) FROM lists WHERE list_id = " + list.uniqueId);
     rs.first();
