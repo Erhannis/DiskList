@@ -14,6 +14,7 @@ import java.lang.ref.Reference;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.security.ProtectionDomain;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -117,7 +118,85 @@ public class Test {
     }
   }
 
+  public static class A {
+    static {
+      System.out.println("loading A");
+    }
+  }
+
+  public static class B extends A {
+    static {
+      System.out.println("loading B");
+    }
+
+    @Override
+    protected void finalize() throws Throwable {
+      System.out.println("(B).finalize()");
+      super.finalize(); //To change body of generated methods, choose Tools | Templates.
+    }
+  }
+
+  public static class C extends B {
+    static {
+      System.out.println("loading C");
+    }
+  }
+
   public static class HelloAgent {
+    private HashSet<Class<?>> handled = new HashSet<>();
+
+    private static ClassFileTransformer transformer = new ClassFileTransformer() {
+      public byte[] transform(ClassLoader loader, String className, Class redefiningClass, ProtectionDomain domain, byte[] bytes) throws IllegalClassFormatException {
+        return transformClass(redefiningClass, bytes);
+      }
+
+      private byte[] transformClass(Class classToTransform, byte[] b) {
+        ClassPool pool = ClassPool.getDefault();
+        CtClass cl = null;
+        try {
+          cl = pool.makeClass(new java.io.ByteArrayInputStream(b));
+
+          System.out.println("Transforming class: " + cl.getName());
+
+//            try {
+//              cl.getDeclaredField("diskCacheHandle");
+//              throw new RuntimeException("Class already has field diskCacheHandle");
+//            } catch (NotFoundException e) {
+//            }
+//            cl.addField(new CtField(CtClass.longType, "diskCacheHandle", cl));
+//            
+//            CtMethod newMethod = new CtMethod(CtClass.voidType, "diskCacheMethod", new CtClass[0], cl);
+//            newMethod.setModifiers(AccessFlag.PRIVATE);
+//            newMethod.setBody("System.out.println(\"in diskCacheMethod\");");
+//            cl.addMethod(newMethod);
+          CtBehavior[] methods = cl.getDeclaredBehaviors();
+          for (int i = 0; i < methods.length; i++) {
+            changeMethod(methods[i]);
+          }
+          b = cl.toBytecode();
+        } catch (Exception e) {
+          e.printStackTrace();
+        } finally {
+          if (cl != null) {
+            cl.detach();
+          }
+        }
+        return b;
+      }
+
+      private void changeMethod(CtBehavior method) throws NotFoundException, CannotCompileException {
+        //System.out.println("check changing method " + method.getDeclaringClass().getName() + " . " + method.getLongName());
+        if (method.getName().equals("finalize")) {
+          method.insertBefore("System.out.println(\"started method at \" + new java.util.Date());");
+          method.insertAfter("System.out.println(\"ended method at \" + new java.util.Date());");
+        }
+      }
+    };
+
+    public static void premain(String args, Instrumentation instrumentation) {
+      instrumentation.addTransformer(transformer);
+      System.out.println("premain");
+    }
 
     public static void agentmain(String agentArgs, Instrumentation inst) {
       System.out.println(agentArgs);
@@ -125,59 +204,19 @@ public class Test {
       System.out.println("I've got instrumentation!: " + inst);
 
       //Unsafe unsafe = Unsafe.getUnsafe();
-      inst.addTransformer(new ClassFileTransformer() {
-        public byte[] transform(ClassLoader loader, String className, Class redefiningClass, ProtectionDomain domain, byte[] bytes) throws IllegalClassFormatException {
-          return transformClass(redefiningClass, bytes);
-        }
-
-        private byte[] transformClass(Class classToTransform, byte[] b) {
-          ClassPool pool = ClassPool.getDefault();
-          CtClass cl = null;
-          try {
-            cl = pool.makeClass(new java.io.ByteArrayInputStream(b));
-
-//                        CtMethod newMethod = new CtMethod(CtClass.voidType, "diskCacheMethod", new CtClass[0], cl);
-//                        newMethod.setModifiers(AccessFlag.PRIVATE);
-//                        newMethod.setBody("System.out.println(\"in diskCacheMethod\");");
-//                        cl.addMethod(newMethod);
-            cl.addField(new CtField(CtClass.longType, "diskCacheHandle", cl));
-
-            CtBehavior[] methods = cl.getDeclaredBehaviors();
-            for (int i = 0; i < methods.length; i++) {
-              if (methods[i].isEmpty() == false) {
-                changeMethod(methods[i]);
-              }
-            }
-            b = cl.toBytecode();
-          } catch (Exception e) {
-            e.printStackTrace();
-          } finally {
-            if (cl != null) {
-              cl.detach();
-            }
-          }
-          return b;
-        }
-
-        private void changeMethod(CtBehavior method) throws NotFoundException, CannotCompileException {
-          //System.out.println("check changing method " + method.getDeclaringClass().getName() + " . " + method.getLongName());
-          if (method.getName().equals("setValue")) {
-            method.insertBefore("System.out.println(\"started method at \" + new java.util.Date());");
-            method.insertAfter("System.out.println(\"ended method at \" + new java.util.Date());");
-          }
-        }
-      }, true);
-      try {
-        System.out.println("redefine: " + inst.isRedefineClassesSupported());
-        System.out.println("retransform: " + inst.isRetransformClassesSupported());
-        System.out.println("native: " + inst.isNativeMethodPrefixSupported());
-        inst.retransformClasses(ClassBlah.class);
-        inst.retransformClasses(ArrayList.class);
-        inst.retransformClasses(Object.class);
-        inst.retransformClasses(List.class);
-      } catch (UnmodifiableClassException ex) {
-        ex.printStackTrace();
-      }
+//      inst.addTransformer(, true);
+//
+//      try {
+//        System.out.println("redefine: " + inst.isRedefineClassesSupported());
+//        System.out.println("retransform: " + inst.isRetransformClassesSupported());
+//        System.out.println("native: " + inst.isNativeMethodPrefixSupported());
+//        inst.retransformClasses(ClassBlah.class);
+//        inst.retransformClasses(ArrayList.class);
+//        inst.retransformClasses(Object.class);
+//        inst.retransformClasses(List.class);
+//      } catch (UnmodifiableClassException ex) {
+//        ex.printStackTrace();
+//      }
     }
   }
 
@@ -200,7 +239,97 @@ public class Test {
 
   public static ArrayList<Object> finalized = new ArrayList<>();
 
-  public static void main(String[] args) throws InterruptedException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
+  public static void main(String[] args) throws InterruptedException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException, NoSuchMethodException {
+    { // I think maybe the extra field is working.
+      HashMap<Object, Long> addresses = new HashMap<>();
+      Object o0 = new Object();
+      System.out.println("address: " + o0.uniqueId);
+      long id = 1;
+      while (true) {
+        Object o = new Object();
+        o.uniqueId = id;
+        id++;
+        long address = o.uniqueId;
+        addresses.put(o, address);
+
+        for (Entry<Object, Long> entry : addresses.entrySet()) {
+          long curAddress = entry.getKey().uniqueId;
+          if (entry.getValue() != curAddress) {
+            throw new RuntimeException("Address changed after " + addresses.size() + ", from " + entry.getValue() + " to " + curAddress);
+          }
+        }
+        if (addresses.size() % 100 == 0) {
+          System.out.println("count " + addresses.size());
+        }
+
+        if (1 == 0) {
+          break;
+        }
+      }
+
+      if (1 == 1) {
+        return;
+      }
+    }
+    { // I think maybe the extra field is working.  Reflection is SLOW, though....I think?
+      Field field = Object.class.getDeclaredField("uniqueId");
+
+      HashMap<Object, Long> addresses = new HashMap<>();
+      Object o0 = new Object();
+      System.out.println("address: " + field.getLong(o0));
+      long id = 1;
+      while (true) {
+        Object o = new Object();
+        field.setLong(o, id);
+        id++;
+        long address = field.getLong(o);
+        addresses.put(o, address);
+
+        for (Entry<Object, Long> entry : addresses.entrySet()) {
+          long curAddress = field.getLong(entry.getKey());
+          if (entry.getValue() != curAddress) {
+            throw new RuntimeException("Address changed after " + addresses.size() + ", from " + entry.getValue() + " to " + curAddress);
+          }
+        }
+        if (addresses.size() % 100 == 0) {
+          System.out.println("count " + addresses.size());
+        }
+
+        if (1 == 0) {
+          break;
+        }
+      }
+
+      if (1 == 1) {
+        return;
+      }
+    }
+    {
+      C c = new C();
+      Object o = new Object();
+      Field field = Object.class.getDeclaredField("uniqueId");
+      field.setLong(o, 10);
+      System.out.println("id: " + field.getLong(o));
+
+      if (1 == 1) {
+        return;
+      }
+    }
+    {
+      AgentLoader.loadAgentClass(HelloAgent.class.getName(), "Hello!");
+      C c = new C();
+
+      if (1 == 1) {
+        return;
+      }
+    }
+    { // Good, Object has a defined `finalize` method
+      Method m = Object.class.getDeclaredMethod("finalize");
+      System.out.println(m);
+      if (1 == 1) {
+        return;
+      }
+    }
     { // No dice; weak references aren't returned if the finalizer restores a reference.
       WeakReference<Zombie> wr = new WeakReference<>(new Zombie());
       while (finalized.isEmpty()) {

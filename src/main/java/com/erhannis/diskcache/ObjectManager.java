@@ -11,12 +11,18 @@ import java.lang.ref.WeakReference;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.util.HashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  *
  * @author erhannis
  */
 public class ObjectManager {
+  private AtomicLong curId = new AtomicLong(1);
+  
+  private HashMap<Long, Object> objects = new HashMap<>();
+  
   public ObjectManager() throws IOException {
     this(getTempFile());
   }
@@ -37,12 +43,23 @@ public class ObjectManager {
   }
   
   public synchronized long getHandle(Object o) {
-    WeakReference<Object> wr = new WeakReference<>(o);
-    return (long)asdf();
+    if (o.uniqueId != 0) {
+      o.uniqueId = curId.getAndIncrement();
+    }
+    asdf(); //TODO Instrument class?
+    return o.uniqueId;
   }
 
   public synchronized Object getObject(long handle) {
+    
     return asdf();
+  }
+
+  public synchronized void removeHandle(Object o) {
+    if (o.uniqueId != 0) {
+      objects.remove(o);
+    }
+    o.uniqueId = 0;
   }
   
   //TODO removeHandle?
