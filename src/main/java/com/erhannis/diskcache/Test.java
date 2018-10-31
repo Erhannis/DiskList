@@ -6,6 +6,7 @@
 package com.erhannis.diskcache;
 
 import com.ea.agentloader.AgentLoader;
+import com.esotericsoftware.kryo.Kryo;
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.IllegalClassFormatException;
 import java.lang.instrument.Instrumentation;
@@ -122,7 +123,7 @@ public class Test {
     static {
       System.out.println("loading A");
     }
-    
+
     public String a = "empty";
   }
 
@@ -132,7 +133,7 @@ public class Test {
     }
 
     public String b = "empty";
-    
+
     @Override
     protected void finalize() throws Throwable {
       System.out.println("(B).finalize()");
@@ -144,7 +145,7 @@ public class Test {
     static {
       System.out.println("loading C");
     }
-    
+
     public String c = "empty";
   }
 
@@ -208,6 +209,11 @@ public class Test {
       System.out.println(agentArgs);
       System.out.println("Hi from the agent!");
       System.out.println("I've got instrumentation!: " + inst);
+      try {
+      Thread.sleep(5000);
+      } catch (Throwable t) {
+        
+      }
 
       //Unsafe unsafe = Unsafe.getUnsafe();
 //      inst.addTransformer(, true);
@@ -252,13 +258,65 @@ public class Test {
 
   public static void main(String[] args) throws InterruptedException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException, NoSuchMethodException {
     {
+      System.out.println("loading Kryo");
+      Kryo kryo = new Kryo();
+      kryo.setRegistrationRequired(false);
+      System.out.println("loaded Kryo");
+      System.out.println("loading agent");
+      //AgentLoader.loadAgentClass(FinalizationAgent.class.getName(), null);
+      AgentLoader.loadAgentClass(HelloAgent.class.getName(), "Hello!");
+      System.out.println("loaded agent");
+      if (1 == 1) {
+        return;
+      }
+    }
+    {
+      System.out.println("loading ObjectManager");
+      ObjectManager.singleton.getClass();
+      System.out.println("creating DiskList");
+      DiskList<C> list = new DiskList<C>();
+
+      StringBuilder sb = new StringBuilder();
+      sb.append("blah");
+      sb.append("blah");
+      System.out.println(sb.toString());
+      HashMap<Fake, Long> addresses = new HashMap<>();
+      Fake o0 = new Fake();
+      System.out.println("address: " + o0.uniqueId);
+      long startTimestamp = System.currentTimeMillis();
+      long id = 1;
+      for (int i = 0; i < 30000; i++) {
+        Fake o = new Fake();
+        o.uniqueId = id;
+        id++;
+        long address = o.uniqueId;
+        addresses.put(o, address);
+
+        for (Entry<Fake, Long> entry : addresses.entrySet()) {
+          long curAddress = entry.getKey().uniqueId;
+          if (entry.getValue() != curAddress) {
+            throw new RuntimeException("Address changed after " + addresses.size() + ", from " + entry.getValue() + " to " + curAddress);
+          }
+        }
+      }
+      System.out.println("count " + addresses.size());
+      System.out.println("time " + (System.currentTimeMillis() - startTimestamp));
+      System.out.println();
+
+      if (1 == 1) {
+        return;
+      }
+    }
+    {
       DiskList<C> list = new DiskList<C>();
       for (int i = 0; i < 1000000; i++) {
         C c = new C();
         list.add(c);
       }
-      
-      if (1 == 1) return;
+
+      if (1 == 1) {
+        return;
+      }
     }
     { // Cool, wasn't COMPLETELY sure that field-hiding worked how I thought
       Fake f = new Fake();
@@ -266,8 +324,10 @@ public class Test {
       Object o = f;
       o.uniqueId = 2;
       System.out.println("f " + f.uniqueId);
-      System.out.println("o " + ((Object)f).uniqueId);
-      if (1 == 1) return;
+      System.out.println("o " + ((Object) f).uniqueId);
+      if (1 == 1) {
+        return;
+      }
     }
     {
       Field field = Object.class.getDeclaredField("uniqueId");

@@ -60,8 +60,10 @@ public class ObjectManager {
   }
 
   private ObjectManager(File cache) {
+    System.out.println("ObjectManager cache");
     AgentLoader.loadAgentClass(FinalizationAgent.class.getName(), null);
 
+    System.out.println("loaded agentloader");
     mKryo = new Kryo();
     mKryo.setRegistrationRequired(false); //TODO Is this a security hazard?
     try {
@@ -77,6 +79,7 @@ public class ObjectManager {
   }
 
   private static File getTempFile() {
+    System.out.println("getTempFile");
     try {
       File f = File.createTempFile("cache", "db");
       f.deleteOnExit();
