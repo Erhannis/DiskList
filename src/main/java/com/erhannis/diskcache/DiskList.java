@@ -18,6 +18,10 @@ public class DiskList<T> {
   private AtomicInteger size = new AtomicInteger(0);
   private final Context ctx;
 
+  public DiskList() {
+    this(new Context(ObjectManager.singleton));
+  }
+  
   public DiskList(Context ctx) {
     ctx.manager.listRegister(this);
     this.ctx = ctx;
@@ -39,6 +43,7 @@ public class DiskList<T> {
     } catch (SQLException ex) {
       Logger.getLogger(DiskList.class.getName()).log(Level.SEVERE, null, ex);
     }
+    return null; //TODO Probably do something else 
   }
 
   public synchronized int size() {
@@ -51,7 +56,11 @@ public class DiskList<T> {
   }
 
   public synchronized void remove(int index) {
-    ctx.manager.listRemove(this, index);
-    size.decrementAndGet();
+    try {
+      ctx.manager.listRemove(this, index);
+      size.decrementAndGet();
+    } catch (SQLException ex) {
+      Logger.getLogger(DiskList.class.getName()).log(Level.SEVERE, null, ex);
+    }
   }
 }

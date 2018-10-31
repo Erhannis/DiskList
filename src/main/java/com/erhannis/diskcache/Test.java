@@ -122,6 +122,8 @@ public class Test {
     static {
       System.out.println("loading A");
     }
+    
+    public String a = "empty";
   }
 
   public static class B extends A {
@@ -129,6 +131,8 @@ public class Test {
       System.out.println("loading B");
     }
 
+    public String b = "empty";
+    
     @Override
     protected void finalize() throws Throwable {
       System.out.println("(B).finalize()");
@@ -140,6 +144,8 @@ public class Test {
     static {
       System.out.println("loading C");
     }
+    
+    public String c = "empty";
   }
 
   public static class HelloAgent {
@@ -245,6 +251,15 @@ public class Test {
   }
 
   public static void main(String[] args) throws InterruptedException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException, NoSuchMethodException {
+    {
+      DiskList<C> list = new DiskList<C>();
+      for (int i = 0; i < 1000000; i++) {
+        C c = new C();
+        list.add(c);
+      }
+      
+      if (1 == 1) return;
+    }
     { // Cool, wasn't COMPLETELY sure that field-hiding worked how I thought
       Fake f = new Fake();
       f.uniqueId = 1;
